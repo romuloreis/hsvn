@@ -6,7 +6,7 @@ import networkx as nx
 
 #Create SN
 #Read the Topology from the BRITE file
-topology = fnss.parse_brite("briteTopology.brite")
+topology = fnss.parse_brite("bigSN.brite")
 
 #Set weight to 1
 fnss.set_weights_constant(topology, 1)
@@ -26,7 +26,7 @@ for u, v in SN.edges():
 	SN.edge[u][v]['cur_bw'] = 1000
 
 #Create Virtual Network 1
-topology = fnss.parse_brite("briteTopology.brite")
+topology = fnss.parse_brite("VN1.brite")
 
 #Set weight to 1
 fnss.set_weights_constant(topology, 1)
@@ -50,7 +50,7 @@ for u, v in VN1.edges():
 
 
 #Create Virtual Network 2
-topology = fnss.parse_brite("briteTopology.brite")
+topology = fnss.parse_brite("VN2.brite")
 
 #Set weight to 1
 fnss.set_weights_constant(topology, 1)
@@ -67,7 +67,7 @@ for n in VN2.nodes():
 
 for u, v in VN2.edges():
 	VN2.edge[u][v]['sync'] = False
-	VN1.edge[u][v]['weight'] = 1
+	VN2.edge[u][v]['weight'] = 1
 	VN2.edge[u][v]['bw'] = 100
 	VN2.edge[u][v]['mapped'] = False
 	VN2.edge[u][v]['physicalPath'] = None
@@ -96,7 +96,7 @@ def getSyncFirstFit(virtualNode, substrateNetwork):
 			#verify if it has enough cpu capacity
 			if substrateNetwork.node[n]['cur_cpu'] >= virtualNode.get('cpu'):
 				#Set bestFit with the node with more CPU capacity
-				if substrateNetwork.node[n]['cur_cpu'] > firstFit.get('cur_cpu'):
+				if substrateNetwork.node[n]['cur_cpu'] >= firstFit.get('cur_cpu'):
 					firstFit = substrateNetwork.node[n]
 					nodeAvaiable = True
 	if nodeAvaiable:
@@ -120,7 +120,7 @@ def getAsyncFirstFit(virtualNode, substrateNetwork):
 			#verify if it has enough cpu capacity
 			if substrateNetwork.node[n]['cur_cpu'] >= virtualNode.get('cpu'):
 				#Set bestFit with the node with more CPU capacity
-				if substrateNetwork.node[n]['cur_cpu'] > firstFit.get('cur_cpu'):
+				if substrateNetwork.node[n]['cur_cpu'] >= firstFit.get('cur_cpu'):
 					firstFit = substrateNetwork.node[n]
 					nodeAvaiable = True
 	if nodeAvaiable:
@@ -152,21 +152,21 @@ def mapSyncNodes(virtualNetwork, substrateNetwork):
 								#This physical node become the new bestFit node
 									besFit = substrateNetwork.node[pn]
 
-				#after for each physical node...
-				#if bestFit is not None
-				if bestFit is not None:
-					#virtual node is mapped on the best fit..
-					virtualNetwork.node[vn]['physicalNode'] = bestFit
-					#the physical node "best fit" has the CPU capacity reduced
-					virtualNetwork.node[vn]['cur_cpu'] = (virtualNetwork.node[vn]['cur_cpu'] - virtualNetwork.node[vn]['cpu'])
-					#AAAAAAAAAA virtualNetwork.node[vn]['physicalNode'].set(cur_cpu - virtualNetwork.node[vn]['cpu'])
-					#here it happens the mapping process... now the virutal node knows where it is mapped
-					#set the physical node as NO IDLE (BUSY)
-					bestFit['idle'] = False
-					return True
-				else:
-					#Tehre is no avaiable Physical Node
-					return False
+			#after for each physical node...
+			#if bestFit is not None
+			if bestFit is not None:
+				#virtual node is mapped on the best fit..
+				virtualNetwork.node[vn]['physicalNode'] = bestFit
+				#the physical node "best fit" has the CPU capacity reduced
+				besFit['cur_cpu'] = (besFit['cur_cpu'] - virtualNetwork.node[vn]['cpu'])
+				#AAAAAAAAAA virtualNetwork.node[vn]['physicalNode'].set(cur_cpu - virtualNetwork.node[vn]['cpu'])
+				#here it happens the mapping process... now the virutal node knows where it is mapped
+				#set the physical node as NO IDLE (BUSY)
+				bestFit['idle'] = False
+				return True
+			else:
+				#Tehre is no avaiable Physical Node
+				return False
 
 
 
@@ -193,98 +193,76 @@ def mapAsyncNodes(virtualNetwork, substrateNetwork):
 								#This physical node become the new bestFit node
 									besFit = substrateNetwork.node[pn]
 
+
+			#after for each physical node...
+			#if bestFit is not None
+			if bestFit is not None:
+				#virtual node is mapped on the best fit..
+				virtualNetwork.node[vn]['physicalNode'] = bestFit
+				#the physical node "best fit" has the CPU capacity reduced
+				besFit['cur_cpu'] = (besFit['cur_cpu'] - virtualNetwork.node[vn]['cpu'])
+				#AAAAAAAAAA virtualNetwork.node[vn]['physicalNode'].set(cur_cpu - virtualNetwork.node[vn]['cpu'])
+				#here it happens the mapping process... now the virutal node knows where it is mapped
+				#set the physical node as NO IDLE (BUSY)
+				bestFit['idle'] = False
+				return True
+			else:
+				bestFit = getSyncFirstFit(virtualNetwork.node[vn], substrateNetwork)
+				#return None if there is no one
+				if bestFit is not None:
+					#for each SYNC physical NODE
+					for pn in substrateNetwork.nodes():
+						#if the physical node is sync...
+						if substrateNetwork.node[pn]['sync'] is True:
+							#if the physical node is idle...
+							if substrateNetwork.node[pn]['idle'] is True:
+								#if the physical node has enough CPU capacity (weight)...
+								if substrateNetwork.node[pn]['cur_cpu'] >=  virtualNetwork.node[vn]['cpu']:
+									#if the physical node has less CPU capacity (weight)...than the candidate
+									if substrateNetwork.node[pn]['cur_cpu'] <= bestFit.get('cur_cpu'):
+									#This physical node become the new bestFit node
+										besFit = substrateNetwork.node[pn]
+
 				#after for each physical node...
 				#if bestFit is not None
 				if bestFit is not None:
 					#virtual node is mapped on the best fit..
 					virtualNetwork.node[vn]['physicalNode'] = bestFit
 					#the physical node "best fit" has the CPU capacity reduced
-					virtualNetwork.node[vn]['cur_cpu'] = (virtualNetwork.node[vn]['cur_cpu'] - virtualNetwork.node[vn]['cpu'])
+					besFit['cur_cpu'] = (besFit['cur_cpu'] - virtualNetwork.node[vn]['cpu'])
 					#AAAAAAAAAA virtualNetwork.node[vn]['physicalNode'].set(cur_cpu - virtualNetwork.node[vn]['cpu'])
 					#here it happens the mapping process... now the virutal node knows where it is mapped
 					#set the physical node as NO IDLE (BUSY)
 					bestFit['idle'] = False
 					return True
 				else:
-					bestFit = getSyncFirstFit(virtualNetwork.node[vn], substrateNetwork)
-					#return None if there is no one
-					if bestFit is not None:
-						#for each SYNC physical NODE
-						for pn in substrateNetwork.nodes():
-							#if the physical node is sync...
-							if substrateNetwork.node[pn]['sync'] is True:
-								#if the physical node is idle...
-								if substrateNetwork.node[pn]['idle'] is True:
-									#if the physical node has enough CPU capacity (weight)...
-									if substrateNetwork.node[pn]['cur_cpu'] >=  virtualNetwork.node[vn]['cpu']:
-										#if the physical node has less CPU capacity (weight)...than the candidate
-										if substrateNetwork.node[pn]['cur_cpu'] <= bestFit.get('cur_cpu'):
-										#This physical node become the new bestFit node
-											besFit = substrateNetwork.node[pn]
+					#There is no avaiable Physical Node
+					return False
 
-					#after for each physical node...
-					#if bestFit is not None
-					if bestFit is not None:
-						#virtual node is mapped on the best fit..
-						virtualNetwork.node[vn]['physicalNode'] = bestFit
-						#the physical node "best fit" has the CPU capacity reduced
-						virtualNetwork.node[vn]['cur_cpu'] = (virtualNetwork.node[vn]['cur_cpu'] - virtualNetwork.node[vn]['cpu'])
-						#AAAAAAAAAA virtualNetwork.node[vn]['physicalNode'].set(cur_cpu - virtualNetwork.node[vn]['cpu'])
-						#here it happens the mapping process... now the virutal node knows where it is mapped
-						#set the physical node as NO IDLE (BUSY)
-						bestFit['idle'] = False
-						return True
-					else:
-						#Tehre is no avaiable Physical Node
-						return False
 #mapAsyncNodes()+++++
 
 def releaseResources(substrateNetwork):
-	for n in substrateNetwork:
+	for n in substrateNetwork.nodes():
 		substrateNetwork.node[n]['idle'] = True
 
 
 def mapVirtualNodes(virtualNetwork, substrateNetwork):
-    if ((mapSyncNodes(virtualNetwork, substrateNetwork) == True) and (mapAsyncNodes(virtualNetwork, substrateNetwork) == True)):
-        print("Todos os nodos foram mapeados com sucesso")
+    if mapSyncNodes(virtualNetwork, substrateNetwork) is True:
+    	print("Todos os nodos Sync foram mapeados com sucesso")
+    if mapAsyncNodes(virtualNetwork, substrateNetwork) is True:
+    	print("Todos os nodos Async foram mapeados com sucesso")
         #seta idle = true for all physical nodes
-        #releaseResources(substrateNetwork)
+        releaseResources(substrateNetwork)
         return True;
     else:
-        print("Mapeamento n efetuado")
+        print("Mapeamento dos nodos n efetuado")
         #Free unused resources
         #freeUnusedNodeResources(virtualGraph, physicalGraph)###############################################
         #seta idle = true for all physical nodes
-        #releaseResources(physicalGraph)
+        releaseResources(substrateNetwork)
         return False;
 
-
-#########MAIN#############
-#For each vn in the list do
-for vn in VNList:
-	mapVirtualNodes(vn, SN)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-####################Path#####################
+"""
 bestPath=None
 paths = nx.single_source_dijkstra_path(SN, 1, weight='weight')
 bw=0
@@ -316,7 +294,20 @@ for path in paths.values():
 
 		print "end"#paths[path]['valid']=True
 print bestPath
-#return bestpath
+"""
+#########MAIN#############
+#For each vn in the list do
+for vn in VNList:
+	factor = 0
+	for n in vn.nodes():
+		factor += vn.node[n]['cpu']
+	vn.graph['factor'] = factor
+
+#Re-order
+#For each vn in the list do
+for vn in VNList:
+	mapVirtualNodes(vn, SN)
+
 
 
 #valid
